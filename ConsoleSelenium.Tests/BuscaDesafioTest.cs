@@ -43,4 +43,31 @@ public class BuscaDesafioTest
             || _driver.Url.Contains("Selenium", StringComparison.OrdinalIgnoreCase),
             "O título ou a URL da página de resultados deveria conter o termo pesquisado.");
     }
+
+    [TestMethod]
+    public void Exercicio2_Autocompletar_SugestoesDinamicas()
+    {
+        const string termo = "C# unit testing";
+        const string seletoresSugestoes = ".search-suggestions-list li, .sbox-suggestions li, [role='option']";
+
+        _driver.Navigate().GoToUrl(UrlBase);
+
+        var campoPesquisa = _driver.FindElement(By.Name("q"));
+        campoPesquisa.SendKeys(termo);
+
+        var wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(10));
+        var sugestoes = wait.Until(d =>
+        {
+            var elementos = d.FindElements(By.CssSelector(seletoresSugestoes));
+            return elementos.Count >= 3 ? elementos : null;
+        });
+
+        sugestoes![2].Click();
+
+        wait.Until(d => d.Url.Contains("q=", StringComparison.OrdinalIgnoreCase));
+
+        Assert.IsTrue(
+            _driver.Url.Contains("q=", StringComparison.OrdinalIgnoreCase),
+            "A navegação deveria ter sido redirecionada para os resultados da opção escolhida.");
+    }
 }
