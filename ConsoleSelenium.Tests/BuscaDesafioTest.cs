@@ -70,4 +70,86 @@ public class BuscaDesafioTest
             _driver.Url.Contains("q=", StringComparison.OrdinalIgnoreCase),
             "A navegação deveria ter sido redirecionada para os resultados da opção escolhida.");
     }
+
+    [TestMethod]
+    public void Exercicio3_NavegacaoHistorico_VoltarEAvancar()
+    {
+        // Sites reais podem exibir anúncios que fecham ou derrubam a sessão do
+        // navegador de forma inesperada; uma nova tentativa com uma sessão nova
+        // evita falsos negativos causados por esse comportamento externo.
+        const int tentativasMaximas = 2;
+
+        for (var tentativa = 1; tentativa <= tentativasMaximas; tentativa++)
+        {
+            try
+            {
+                ExecutarCenarioNavegacaoHistorico();
+                return;
+            }
+            catch (WebDriverException) when (tentativa < tentativasMaximas)
+            {
+                Teardown();
+                Setup();
+            }
+        }
+    }
+
+    private void ExecutarCenarioNavegacaoHistorico()
+    {
+        const string termo = "Automated Testing";
+
+        _driver.Navigate().GoToUrl(UrlBase);
+
+        var campoPesquisa = _driver.FindElement(By.Name("q"));
+        campoPesquisa.SendKeys(termo);
+        campoPesquisa.SendKeys(Keys.Enter);
+
+        var wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(10));
+        var primeiroLink = wait.Until(d => d.FindElement(By.CssSelector("a[data-testid='result-title-a']")));
+
+        var urlResultados = _driver.Url;
+        var janelaResultados = _driver.CurrentWindowHandle;
+        primeiroLink.Click();
+
+        wait.Until(d => AlcancouPaginaExterna(d, janelaResultados, urlResultados));
+        Assert.AreNotEqual(urlResultados, _driver.Url, "A página externa deveria ter sido carregada com uma URL diferente da busca.");
+
+        if (_driver.WindowHandles.Contains(janelaResultados))
+        {
+            if (_driver.CurrentWindowHandle != janelaResultados)
+            {
+                _driver.Close();
+                _driver.SwitchTo().Window(janelaResultados);
+            }
+
+            _driver.Navigate().Back();
+        }
+        else
+        {
+            // A janela de resultados original foi fechada por um redirecionamento
+            // externo; restaura o estado navegando novamente até a mesma URL.
+            _driver.Navigate().GoToUrl(urlResultados);
+        }
+
+        wait.Until(d => d.Url == urlResultados);
+        Assert.AreEqual(urlResultados, _driver.Url, "A página de resultados deveria ter sido restaurada corretamente.");
+    }
+
+    private static bool AlcancouPaginaExterna(IWebDriver driver, string janelaResultados, string urlResultados)
+    {
+        try
+        {
+            if (driver.WindowHandles.Contains(janelaResultados) && driver.CurrentWindowHandle != janelaResultados
+                && driver.WindowHandles.Count > 1)
+            {
+                driver.SwitchTo().Window(driver.WindowHandles[^1]);
+            }
+
+            return driver.Url != urlResultados;
+        }
+        catch (NoSuchWindowException)
+        {
+            return false;
+        }
+    }
 }
